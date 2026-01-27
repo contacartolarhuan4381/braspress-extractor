@@ -28,7 +28,7 @@ const validateCNPJ = (req, res, next) => {
 // Endpoint: Buscar CNPJ
 app.post('/api/search', validateCNPJ, async (req, res) => {
     try {
-        const data = await cnpjScraper.searchCNPJ(req.cnpj);
+        const data = await cnpjScraper({ cnpj: req.cnpj });
         
         if (!data) {
             return res.json({ ok: false, error: 'CNPJ não encontrado na base de dados' });
