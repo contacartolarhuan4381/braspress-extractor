@@ -237,14 +237,47 @@
         </div>
 
         <div class="content">
-            <div class="input-group">
-                <input 
-                    type="text" 
-                    id="cnpj" 
-                    placeholder="Digite seu CNPJ (ex: 11.222.333/0001-81)"
-                    maxlength="18"
-                />
-                <button id="searchBtn" onclick="searchCNPJ()">Buscar</button>
+            <!-- Abas -->
+            <div style="display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb;">
+                <button id="tabBusca" class="tab-btn active" onclick="switchTab('busca')" style="background: none; border: none; padding: 10px 0; border-bottom: 3px solid #667eea; font-size: 14px; font-weight: 600; color: #667eea;">🔍 Busca Simples</button>
+                <button id="tabLote" class="tab-btn" onclick="switchTab('lote')" style="background: none; border: none; padding: 10px 0; border-bottom: 3px solid transparent; font-size: 14px; font-weight: 600; color: #999;">📦 Busca em Lote</button>
+            </div>
+
+            <!-- Tab: Busca Simples -->
+            <div id="abaBusca" class="tab-content active">
+                <div class="input-group">
+                    <input 
+                        type="text" 
+                        id="cnpj" 
+                        placeholder="Digite seu CNPJ (ex: 11.222.333/0001-81)"
+                        maxlength="18"
+                    />
+                    <button id="searchBtn" onclick="searchCNPJ()">Buscar</button>
+                </div>
+            </div>
+
+            <!-- Tab: Busca em Lote -->
+            <div id="abaLote" class="tab-content" style="display: none;">
+                <div style="background: #f0f4ff; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #667eea;">
+                    <p style="font-size: 13px; color: #333; margin-bottom: 10px;"><strong>📁 Formatos aceitos:</strong></p>
+                    <p style="font-size: 12px; color: #666; margin-bottom: 8px;">✓ CSV com coluna "CNPJ" ou "cnpj"</p>
+                    <p style="font-size: 12px; color: #666; margin-bottom: 8px;">✓ Excel (.xlsx) com coluna "CNPJ"</p>
+                    <p style="font-size: 12px; color: #666;">✓ Máximo: 100 CNPJs por arquivo</p>
+                </div>
+                
+                <div style="border: 2px dashed #667eea; border-radius: 8px; padding: 30px; text-align: center; background: #f9faff; cursor: pointer;" id="dropZone" onclick="document.getElementById('fileInput').click();">
+                    <p style="font-size: 24px; margin-bottom: 10px;">📤</p>
+                    <p style="font-size: 16px; color: #667eea; font-weight: 600; margin-bottom: 5px;">Clique ou arraste arquivos</p>
+                    <p style="font-size: 12px; color: #999;">CSV ou Excel com lista de CNPJs</p>
+                    <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" style="display: none;" onchange="handleFileUpload(event)" />
+                </div>
+
+                <div id="fileInfo" style="display: none; margin-top: 15px; padding: 15px; background: #f0f4ff; border-radius: 8px;">
+                    <p style="font-size: 13px; color: #333;"><strong id="fileName"></strong></p>
+                    <p style="font-size: 12px; color: #666; margin-top: 5px;"><strong id="fileCount"></strong></p>
+                </div>
+
+                <button id="processBtn" onclick="processLote()" style="width: 100%; margin-top: 20px; display: none;">⚡ Processar Lote</button>
             </div>
 
             <div class="error" id="errorMsg"></div>
@@ -252,7 +285,30 @@
 
             <div class="loading" id="loading">
                 <div class="spinner"></div>
-                <p>Buscando dados...</p>
+                <p id="loadingText">Buscando dados...</p>
+            </div>
+
+            <!-- Tabela de Resultados em Lote -->
+            <div id="loteResults" style="display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h3 style="color: #333; font-size: 16px;">📊 Resultados (<span id="resultCount">0</span>)</h3>
+                    <button class="btn-small" onclick="downloadResults()" style="flex: 0; min-width: auto; padding: 8px 16px; font-size: 12px;">⬇️ Download CSV</button>
+                </div>
+                <div style="max-height: 400px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 8px;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+                        <thead style="background: #f0f4ff; position: sticky; top: 0;">
+                            <tr>
+                                <th style="padding: 10px; text-align: left; border-bottom: 1px solid #e5e7eb;">CNPJ</th>
+                                <th style="padding: 10px; text-align: left; border-bottom: 1px solid #e5e7eb;">Empresa</th>
+                                <th style="padding: 10px; text-align: left; border-bottom: 1px solid #e5e7eb;">Telefone</th>
+                                <th style="padding: 10px; text-align: left; border-bottom: 1px solid #e5e7eb;">Email</th>
+                                <th style="padding: 10px; text-align: center; border-bottom: 1px solid #e5e7eb;">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultTable">
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             <div class="result-card" id="resultCard">
@@ -393,6 +449,152 @@
         document.getElementById('cnpj').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') searchCNPJ();
         });
+
+        let uploadedFile = null;
+        let batchResults = [];
+
+        // Drag and drop
+        const dropZone = document.getElementById('dropZone');
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.style.background = '#e8ecff';
+        });
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.style.background = '#f9faff';
+        });
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.style.background = '#f9faff';
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                document.getElementById('fileInput').files = files;
+                handleFileUpload({ target: { files } });
+            }
+        });
+
+        function switchTab(tab) {
+            document.getElementById('tabBusca').style.borderBottom = tab === 'busca' ? '3px solid #667eea' : '3px solid transparent';
+            document.getElementById('tabBusca').style.color = tab === 'busca' ? '#667eea' : '#999';
+            document.getElementById('tabLote').style.borderBottom = tab === 'lote' ? '3px solid #667eea' : '3px solid transparent';
+            document.getElementById('tabLote').style.color = tab === 'lote' ? '#667eea' : '#999';
+            
+            document.getElementById('abaBusca').style.display = tab === 'busca' ? 'block' : 'none';
+            document.getElementById('abaLote').style.display = tab === 'lote' ? 'block' : 'none';
+            document.getElementById('resultCard').classList.remove('show');
+            document.getElementById('loteResults').style.display = 'none';
+            hideError();
+            hideSuccess();
+        }
+
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            uploadedFile = file;
+            document.getElementById('fileName').textContent = '📄 ' + file.name;
+            document.getElementById('fileInfo').style.display = 'block';
+            document.getElementById('processBtn').style.display = 'block';
+            showSuccess('✅ Arquivo selecionado! Clique em Processar.');
+        }
+
+        async function processLote() {
+            if (!uploadedFile) {
+                showError('Por favor, selecione um arquivo');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', uploadedFile);
+
+            showLoading(true);
+            document.getElementById('loadingText').textContent = 'Processando lote...';
+            document.getElementById('processBtn').disabled = true;
+            hideError();
+            hideSuccess();
+
+            try {
+                const response = await fetch('/api/batch', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.ok) {
+                    batchResults = result.data;
+                    displayBatchResults(result.data);
+                    showSuccess(`✅ ${result.data.length} CNPJs processados!`);
+                } else {
+                    showError('❌ ' + result.error);
+                }
+            } catch (error) {
+                showError('Erro ao processar lote: ' + error.message);
+            } finally {
+                showLoading(false);
+                document.getElementById('processBtn').disabled = false;
+            }
+        }
+
+        function displayBatchResults(data) {
+            const table = document.getElementById('resultTable');
+            table.innerHTML = '';
+            document.getElementById('resultCount').textContent = data.length;
+
+            data.forEach((item, index) => {
+                const row = document.createElement('tr');
+                const status = item.found ? '✅ OK' : '❌ Não encontrado';
+                const statusColor = item.found ? '#3c3' : '#c33';
+                
+                row.innerHTML = `
+                    <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;">${item.cnpj}</td>
+                    <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;">${item.found ? item.nome : '-'}</td>
+                    <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;">${item.found ? item.telefone : '-'}</td>
+                    <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;">${item.found ? item.email : '-'}</td>
+                    <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; text-align: center; color: ${statusColor}; font-weight: bold;">${status}</td>
+                `;
+                table.appendChild(row);
+            });
+
+            document.getElementById('loteResults').style.display = 'block';
+        }
+
+        function downloadResults() {
+            if (batchResults.length === 0) {
+                showError('Nenhum resultado para baixar');
+                return;
+            }
+
+            const csv = [
+                ['CNPJ', 'Nome/Razão Social', 'Telefone', 'Email', 'Endereço'].join(',')
+            ];
+
+            batchResults.forEach(item => {
+                if (item.found) {
+                    csv.push([
+                        item.cnpj,
+                        `"${item.nome}"`,
+                        `"${item.telefone}"`,
+                        `"${item.email}"`,
+                        `"${item.endereco}"`
+                    ].join(','));
+                }
+            });
+
+            const csvContent = csv.join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            
+            link.setAttribute('href', url);
+            link.setAttribute('download', `braspress-resultados-${new Date().toISOString().split('T')[0]}.csv`);
+            link.style.visibility = 'hidden';
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            showSuccess('✅ Arquivo baixado!');
+        }
     </script>
 </body>
 </html>
