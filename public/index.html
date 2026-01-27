@@ -396,79 +396,18 @@
     </div>
 
     <script>
+        // ===== ESTADO GLOBAL =====
         let currentData = null;
+        let uploadedFile = null;
+        let batchResults = [];
+        let nicheResults = [];
 
-        async function searchCNPJ() {
-            const cnpj = document.getElementById('cnpj').value.trim();
-            
-            if (!cnpj) {
-                showError('Por favor, insira um CNPJ');
-                return;
-            }
-
-            const clean = cnpj.replace(/\D/g, '');
-            if (clean.length !== 14) {
-                showError('CNPJ deve ter 14 dígitos');
-                return;
-            }
-
-            showLoading(true);
-            hideError();
-            hideSuccess();
-
-            try {
-                const response = await fetch('/api/search', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ cnpj })
-                });
-
-                const result = await response.json();
-
-                if (result.ok) {
-                    currentData = result.data;
-                    document.getElementById('resultNome').textContent = result.data.nome;
-                    document.getElementById('resultTelefone').textContent = result.data.telefone;
-                    document.getElementById('resultEmail').textContent = result.data.email;
-                    document.getElementById('resultEndereco').textContent = result.data.endereco;
-                    
-                    document.getElementById('resultCard').classList.add('show');
-                    showSuccess('✅ Dados encontrados com sucesso!');
-                } else {
-                    showError('❌ ' + result.error);
-                    document.getElementById('resultCard').classList.remove('show');
-                }
-            } catch (error) {
-                showError('Erro ao buscar dados: ' + error.message);
-                document.getElementById('resultCard').classList.remove('show');
-            } finally {
-                showLoading(false);
-            }
-        }
-
-        function copyPhone() {
-            if (!currentData) return;
-            navigator.clipboard.writeText(currentData.telefone.replace(/\D/g, ''));
-            showSuccess('✅ Telefone copiado!');
-        }
-
-        function copyEmail() {
-            if (!currentData) return;
-            navigator.clipboard.writeText(currentData.email);
-            showSuccess('✅ Email copiado!');
-        }
-
-        function copyAll() {
-            if (!currentData) return;
-            const text = `Nome: ${currentData.nome}\nTelefone: ${currentData.telefone}\nEmail: ${currentData.email}\nEndereço: ${currentData.endereco}`;
-            navigator.clipboard.writeText(text);
-            showSuccess('✅ Todos os dados copiados!');
-        }
-
+        // ===== FUNÇÕES DE INTERFACE =====
         function showError(msg) {
             const el = document.getElementById('errorMsg');
             el.textContent = msg;
             el.classList.add('show');
+            console.error('ERRO:', msg);
         }
 
         function hideError() {
@@ -496,33 +435,8 @@
             }
         }
 
-        document.getElementById('cnpj').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') searchCNPJ();
-        });
-
-        let uploadedFile = null;
-        let batchResults = [];
-
-        // Drag and drop
-        const dropZone = document.getElementById('dropZone');
-        dropZone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            dropZone.style.background = '#e8ecff';
-        });
-        dropZone.addEventListener('dragleave', () => {
-            dropZone.style.background = '#f9faff';
-        });
-        dropZone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            dropZone.style.background = '#f9faff';
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                document.getElementById('fileInput').files = files;
-                handleFileUpload({ target: { files } });
-            }
-        });
-
         function switchTab(tab) {
+            // Atualizar botões
             document.getElementById('tabBusca').style.borderBottom = tab === 'busca' ? '3px solid #667eea' : '3px solid transparent';
             document.getElementById('tabBusca').style.color = tab === 'busca' ? '#667eea' : '#999';
             document.getElementById('tabLote').style.borderBottom = tab === 'lote' ? '3px solid #667eea' : '3px solid transparent';
@@ -530,9 +444,12 @@
             document.getElementById('tabNiche').style.borderBottom = tab === 'niche' ? '3px solid #667eea' : '3px solid transparent';
             document.getElementById('tabNiche').style.color = tab === 'niche' ? '#667eea' : '#999';
             
+            // Atualizar abas
             document.getElementById('abaBusca').style.display = tab === 'busca' ? 'block' : 'none';
             document.getElementById('abaLote').style.display = tab === 'lote' ? 'block' : 'none';
             document.getElementById('abaNiche').style.display = tab === 'niche' ? 'block' : 'none';
+            
+            // Limpar resultados
             document.getElementById('resultCard').classList.remove('show');
             document.getElementById('loteResults').style.display = 'none';
             document.getElementById('nicheResults').style.display = 'none';
@@ -540,6 +457,78 @@
             hideSuccess();
         }
 
+        // ===== ABA 1: BUSCA SIMPLES =====
+        async function searchCNPJ() {
+            const cnpj = document.getElementById('cnpj').value.trim();
+            
+            if (!cnpj) {
+                showError('Por favor, insira um CNPJ');
+                return;
+            }
+
+            const clean = cnpj.replace(/\D/g, '');
+            if (clean.length !== 14) {
+                showError('CNPJ deve ter 14 dígitos');
+                return;
+            }
+
+            showLoading(true);
+            hideError();
+            hideSuccess();
+
+            try {
+                console.log('Buscando CNPJ:', clean);
+                const response = await fetch('/api/search', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ cnpj: clean })
+                });
+
+                const result = await response.json();
+                console.log('Resposta da API:', result);
+
+                if (result.ok) {
+                    currentData = result.data;
+                    document.getElementById('resultNome').textContent = result.data.nome || '-';
+                    document.getElementById('resultTelefone').textContent = result.data.telefone || '-';
+                    document.getElementById('resultEmail').textContent = result.data.email || '-';
+                    document.getElementById('resultEndereco').textContent = result.data.endereco || '-';
+                    
+                    document.getElementById('resultCard').classList.add('show');
+                    showSuccess('✅ Dados encontrados com sucesso!');
+                } else {
+                    showError('❌ ' + (result.error || 'Erro ao buscar'));
+                    document.getElementById('resultCard').classList.remove('show');
+                }
+            } catch (error) {
+                console.error('Erro na busca:', error);
+                showError('Erro ao buscar dados: ' + error.message);
+                document.getElementById('resultCard').classList.remove('show');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function copyPhone() {
+            if (!currentData) return;
+            navigator.clipboard.writeText(currentData.telefone.replace(/\D/g, ''));
+            showSuccess('✅ Telefone copiado!');
+        }
+
+        function copyEmail() {
+            if (!currentData) return;
+            navigator.clipboard.writeText(currentData.email);
+            showSuccess('✅ Email copiado!');
+        }
+
+        function copyAll() {
+            if (!currentData) return;
+            const text = `Nome: ${currentData.nome}\nTelefone: ${currentData.telefone}\nEmail: ${currentData.email}\nEndereço: ${currentData.endereco}`;
+            navigator.clipboard.writeText(text);
+            showSuccess('✅ Todos os dados copiados!');
+        }
+
+        // ===== ABA 2: BUSCA EM LOTE =====
         function handleFileUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -567,21 +556,24 @@
             hideSuccess();
 
             try {
+                console.log('Enviando arquivo:', uploadedFile.name);
                 const response = await fetch('/api/batch', {
                     method: 'POST',
                     body: formData
                 });
 
                 const result = await response.json();
+                console.log('Resposta do lote:', result);
 
                 if (result.ok) {
                     batchResults = result.data;
                     displayBatchResults(result.data);
                     showSuccess(`✅ ${result.data.length} CNPJs processados!`);
                 } else {
-                    showError('❌ ' + result.error);
+                    showError('❌ ' + (result.error || 'Erro ao processar'));
                 }
             } catch (error) {
+                console.error('Erro no processamento:', error);
                 showError('Erro ao processar lote: ' + error.message);
             } finally {
                 showLoading(false);
@@ -594,7 +586,7 @@
             table.innerHTML = '';
             document.getElementById('resultCount').textContent = data.length;
 
-            data.forEach((item, index) => {
+            data.forEach((item) => {
                 const row = document.createElement('tr');
                 const status = item.found ? '✅ OK' : '❌ Não encontrado';
                 const statusColor = item.found ? '#3c3' : '#c33';
@@ -650,8 +642,7 @@
             showSuccess('✅ Arquivo baixado!');
         }
 
-        let nicheResults = [];
-
+        // ===== ABA 3: BUSCA POR NICHO =====
         async function searchNiche() {
             const niche = document.getElementById('niche').value.trim();
             const region = document.getElementById('region').value.trim();
@@ -667,6 +658,7 @@
             hideSuccess();
 
             try {
+                console.log('Buscando nicho:', niche, 'Região:', region);
                 const response = await fetch('/api/search-niche', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -674,16 +666,18 @@
                 });
 
                 const result = await response.json();
+                console.log('Resposta do nicho:', result);
 
                 if (result.ok) {
                     nicheResults = result.data;
                     displayNicheResults(result.data);
                     showSuccess(`✅ ${result.data.length} empresas encontradas!`);
                 } else {
-                    showError('❌ ' + result.error);
+                    showError('❌ ' + (result.error || 'Nenhuma empresa encontrada'));
                     document.getElementById('nicheResults').style.display = 'none';
                 }
             } catch (error) {
+                console.error('Erro na busca de nicho:', error);
                 showError('Erro ao buscar: ' + error.message);
                 document.getElementById('nicheResults').style.display = 'none';
             } finally {
@@ -696,7 +690,7 @@
             table.innerHTML = '';
             document.getElementById('nicheResultCount').textContent = data.length;
 
-            data.forEach((item, index) => {
+            data.forEach((item) => {
                 const row = document.createElement('tr');
                 row.innerHTML = `
                     <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;"><strong>${item.nome}</strong></td>
@@ -746,6 +740,43 @@
             
             showSuccess('✅ Arquivo baixado!');
         }
+
+        // ===== INICIALIZAÇÃO =====
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Página carregada - inicializando event listeners');
+            
+            // Busca simples - Enter no input
+            const cnpjInput = document.getElementById('cnpj');
+            if (cnpjInput) {
+                cnpjInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') searchCNPJ();
+                });
+            }
+
+            // Drag and drop na busca de lote
+            const dropZone = document.getElementById('dropZone');
+            if (dropZone) {
+                dropZone.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    dropZone.style.background = '#e8ecff';
+                });
+                dropZone.addEventListener('dragleave', () => {
+                    dropZone.style.background = '#f9faff';
+                });
+                dropZone.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    dropZone.style.background = '#f9faff';
+                    const files = e.dataTransfer.files;
+                    if (files.length > 0) {
+                        const fileInput = document.getElementById('fileInput');
+                        fileInput.files = files;
+                        handleFileUpload({ target: { files } });
+                    }
+                });
+            }
+
+            console.log('Inicialização completa - tudo pronto!');
+        });
     </script>
 </body>
 </html>

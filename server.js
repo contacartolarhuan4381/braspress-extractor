@@ -15,7 +15,7 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(express.static('public'));
 
 // Middleware para validar CNPJ
@@ -225,9 +225,48 @@ app.use((err, req, res, next) => {
     res.status(500).json({ ok: false, error: 'Erro interno do servidor' });
 });
 
+console.log('🔧 Iniciando aplicação...');
+console.log('   Express versão:', require('express/package.json').version);
+
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+console.log(`📡 Tentando ouvir na porta ${PORT}...`);
+console.log('   [DEBUG] Antes de app.listen()');
+
+try {
+    const server = app.listen(PORT);
+    
+    console.log('[DEBUG] Depois de app.listen()');
     console.log(`✅ Servidor rodando em http://localhost:${PORT}`);
+    console.log(`   PID: ${process.pid}`);
+    console.log(`   Timestamp: ${new Date().toISOString()}`);
+    
+    server.once('error', (err) => {
+        console.error('❌ ERRO AO ESCUTAR NA PORTA:', err.message);
+        console.error('   Código:', err.code);
+        if (err.code === 'EADDRINUSE') {
+            console.error(`❌ Porta ${PORT} já está em uso!`);
+        }
+        process.exit(1);
+    });
+    
+    server.once('listening', () => {
+        console.log('📡 Servidor respondendo a requisições');
+    });
+} catch (err) {
+    console.error('❌ ERRO CRÍTICO:', err.message);
+    console.error('Stack:', err.stack);
+    process.exit(1);
+}
+
+// Previne crash não tratado
+process.on('uncaughtException', (err) => {
+    console.error('❌ Exceção não tratada:', err);
+    process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('❌ Promise rejeitada:', reason);
+    process.exit(1);
 });
 
 module.exports = app;
