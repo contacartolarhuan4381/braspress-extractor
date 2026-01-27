@@ -2,6 +2,7 @@ const express = require('express');
 const path = require('path');
 const cors = require('cors');
 const cnpjScraper = require('./scraper/cnpjScraper');
+const { searchGoogleMaps } = require('./scraper/searchNiche');
 const multer = require('multer');
 const XLSX = require('xlsx');
 const fs = require('fs');
@@ -172,6 +173,31 @@ app.post('/api/batch', upload.single('file'), async (req, res) => {
     } catch (error) {
         console.error('Erro ao processar lote:', error);
         res.status(500).json({ ok: false, error: error.message || 'Erro ao processar arquivo' });
+    }
+});
+
+// Endpoint: Buscar por Nicho + Região
+app.post('/api/search-niche', async (req, res) => {
+    try {
+        const { niche, region } = req.body;
+
+        if (!niche || !region) {
+            return res.json({ ok: false, error: 'Nicho e região são obrigatórios' });
+        }
+
+        console.log(`Buscando ${niche} em ${region}`);
+
+        const results = await searchGoogleMaps(niche, region);
+
+        if (results.length === 0) {
+            return res.json({ ok: false, error: 'Nenhuma empresa encontrada para esta busca' });
+        }
+
+        res.json({ ok: true, data: results });
+
+    } catch (error) {
+        console.error('Erro ao buscar nicho:', error.message);
+        res.status(500).json({ ok: false, error: error.message || 'Erro ao buscar empresas' });
     }
 });
 

@@ -238,9 +238,10 @@
 
         <div class="content">
             <!-- Abas -->
-            <div style="display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb;">
-                <button id="tabBusca" class="tab-btn active" onclick="switchTab('busca')" style="background: none; border: none; padding: 10px 0; border-bottom: 3px solid #667eea; font-size: 14px; font-weight: 600; color: #667eea;">🔍 Busca Simples</button>
-                <button id="tabLote" class="tab-btn" onclick="switchTab('lote')" style="background: none; border: none; padding: 10px 0; border-bottom: 3px solid transparent; font-size: 14px; font-weight: 600; color: #999;">📦 Busca em Lote</button>
+            <div style="display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; overflow-x: auto;">
+                <button id="tabBusca" class="tab-btn active" onclick="switchTab('busca')" style="background: none; border: none; padding: 10px 0; border-bottom: 3px solid #667eea; font-size: 14px; font-weight: 600; color: #667eea; white-space: nowrap;">🔍 Busca Simples</button>
+                <button id="tabLote" class="tab-btn" onclick="switchTab('lote')" style="background: none; border: none; padding: 10px 0; border-bottom: 3px solid transparent; font-size: 14px; font-weight: 600; color: #999; white-space: nowrap;">📦 Busca em Lote</button>
+                <button id="tabNiche" class="tab-btn" onclick="switchTab('niche')" style="background: none; border: none; padding: 10px 0; border-bottom: 3px solid transparent; font-size: 14px; font-weight: 600; color: #999; white-space: nowrap;">🌍 Busca por Nicho</button>
             </div>
 
             <!-- Tab: Busca Simples -->
@@ -278,6 +279,55 @@
                 </div>
 
                 <button id="processBtn" onclick="processLote()" style="width: 100%; margin-top: 20px; display: none;">⚡ Processar Lote</button>
+            </div>
+
+            <!-- Tab: Busca por Nicho -->
+            <div id="abaNiche" class="tab-content" style="display: none;">
+                <div style="background: #f0f4ff; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #667eea;">
+                    <p style="font-size: 13px; color: #333; margin-bottom: 10px;"><strong>🔍 Como funciona:</strong></p>
+                    <p style="font-size: 12px; color: #666; margin-bottom: 8px;">1. Digite o tipo de negócio (ex: pizzaria, consultório, oficina)</p>
+                    <p style="font-size: 12px; color: #666; margin-bottom: 8px;">2. Digite a região/cidade (ex: guarulhos, são paulo, belo horizonte)</p>
+                    <p style="font-size: 12px; color: #666;">3. Receba lista com nome, telefone, email e endereço</p>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px;">
+                    <input 
+                        type="text" 
+                        id="niche" 
+                        placeholder="Ex: pizzaria, consultório, oficina"
+                        style="padding: 12px 16px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 14px;"
+                    />
+                    <input 
+                        type="text" 
+                        id="region" 
+                        placeholder="Ex: guarulhos, são paulo"
+                        style="padding: 12px 16px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 14px;"
+                    />
+                </div>
+
+                <button onclick="searchNiche()" style="width: 100%; padding: 12px 24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 15px;">🌍 Buscar Empresas</button>
+
+                <div id="nicheResults" style="display: none; margin-top: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h3 style="color: #333; font-size: 16px;">📊 Empresas Encontradas (<span id="nicheResultCount">0</span>)</h3>
+                        <button class="btn-small" onclick="downloadNicheResults()" style="flex: 0; min-width: auto; padding: 8px 16px; font-size: 12px;">⬇️ Download CSV</button>
+                    </div>
+                    <div style="max-height: 500px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 8px;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+                            <thead style="background: #f0f4ff; position: sticky; top: 0;">
+                                <tr>
+                                    <th style="padding: 10px; text-align: left; border-bottom: 1px solid #e5e7eb;">Empresa</th>
+                                    <th style="padding: 10px; text-align: left; border-bottom: 1px solid #e5e7eb;">Telefone</th>
+                                    <th style="padding: 10px; text-align: left; border-bottom: 1px solid #e5e7eb;">Email</th>
+                                    <th style="padding: 10px; text-align: left; border-bottom: 1px solid #e5e7eb;">Endereço</th>
+                                    <th style="padding: 10px; text-align: center; border-bottom: 1px solid #e5e7eb;">⭐</th>
+                                </tr>
+                            </thead>
+                            <tbody id="nicheResultTable">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
 
             <div class="error" id="errorMsg"></div>
@@ -477,11 +527,15 @@
             document.getElementById('tabBusca').style.color = tab === 'busca' ? '#667eea' : '#999';
             document.getElementById('tabLote').style.borderBottom = tab === 'lote' ? '3px solid #667eea' : '3px solid transparent';
             document.getElementById('tabLote').style.color = tab === 'lote' ? '#667eea' : '#999';
+            document.getElementById('tabNiche').style.borderBottom = tab === 'niche' ? '3px solid #667eea' : '3px solid transparent';
+            document.getElementById('tabNiche').style.color = tab === 'niche' ? '#667eea' : '#999';
             
             document.getElementById('abaBusca').style.display = tab === 'busca' ? 'block' : 'none';
             document.getElementById('abaLote').style.display = tab === 'lote' ? 'block' : 'none';
+            document.getElementById('abaNiche').style.display = tab === 'niche' ? 'block' : 'none';
             document.getElementById('resultCard').classList.remove('show');
             document.getElementById('loteResults').style.display = 'none';
+            document.getElementById('nicheResults').style.display = 'none';
             hideError();
             hideSuccess();
         }
@@ -587,6 +641,103 @@
             
             link.setAttribute('href', url);
             link.setAttribute('download', `braspress-resultados-${new Date().toISOString().split('T')[0]}.csv`);
+            link.style.visibility = 'hidden';
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            showSuccess('✅ Arquivo baixado!');
+        }
+
+        let nicheResults = [];
+
+        async function searchNiche() {
+            const niche = document.getElementById('niche').value.trim();
+            const region = document.getElementById('region').value.trim();
+
+            if (!niche || !region) {
+                showError('Por favor, preencha nicho e região');
+                return;
+            }
+
+            showLoading(true);
+            document.getElementById('loadingText').textContent = `Buscando ${niche} em ${region}...`;
+            hideError();
+            hideSuccess();
+
+            try {
+                const response = await fetch('/api/search-niche', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ niche, region })
+                });
+
+                const result = await response.json();
+
+                if (result.ok) {
+                    nicheResults = result.data;
+                    displayNicheResults(result.data);
+                    showSuccess(`✅ ${result.data.length} empresas encontradas!`);
+                } else {
+                    showError('❌ ' + result.error);
+                    document.getElementById('nicheResults').style.display = 'none';
+                }
+            } catch (error) {
+                showError('Erro ao buscar: ' + error.message);
+                document.getElementById('nicheResults').style.display = 'none';
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function displayNicheResults(data) {
+            const table = document.getElementById('nicheResultTable');
+            table.innerHTML = '';
+            document.getElementById('nicheResultCount').textContent = data.length;
+
+            data.forEach((item, index) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;"><strong>${item.nome}</strong></td>
+                    <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;">${item.telefone || '-'}</td>
+                    <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;">${item.email || '-'}</td>
+                    <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; font-size: 11px;">${item.endereco || '-'}</td>
+                    <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; text-align: center;">${item.avaliacao || '-'}</td>
+                `;
+                table.appendChild(row);
+            });
+
+            document.getElementById('nicheResults').style.display = 'block';
+        }
+
+        function downloadNicheResults() {
+            if (nicheResults.length === 0) {
+                showError('Nenhum resultado para baixar');
+                return;
+            }
+
+            const csv = [
+                ['Empresa', 'Telefone', 'Email', 'Endereço', 'Avaliação'].join(',')
+            ];
+
+            nicheResults.forEach(item => {
+                csv.push([
+                    `"${item.nome}"`,
+                    `"${item.telefone || ''}"`,
+                    `"${item.email || ''}"`,
+                    `"${item.endereco || ''}"`,
+                    `"${item.avaliacao || ''}"`
+                ].join(','));
+            });
+
+            const csvContent = csv.join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            
+            link.setAttribute('href', url);
+            link.setAttribute('download', `braspress-empresas-${new Date().toISOString().split('T')[0]}.csv`);
             link.style.visibility = 'hidden';
             
             document.body.appendChild(link);
