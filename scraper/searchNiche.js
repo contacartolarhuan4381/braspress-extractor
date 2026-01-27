@@ -1,80 +1,97 @@
-// Busca por nicho usando dados de CNPJ públicos
-// Retorna dados REAIS de empresas registradas
+// Busca por nicho usando Google Places API
+// Retorna dados REAIS de empresas do Google Maps
 
 async function searchGoogleMaps(niche, region, apiKey) {
   try {
-    console.log(`[BUSCA] Procurando ${niche} em ${region}...`);
-    
-    // Usar a Brasil API para buscar empresas por CNAE (atividade econômica)
-    // Mapeamento de nichos para CNAE
-    const nichosToCNAE = {
-      'pizzaria': '5611203', // Restaurante
-      'restaurante': '5611203',
-      'hamburgueria': '5611203',
-      'churrascaria': '5611203',
-      'barbershop': '9602501', // Cabeleireiro
-      'barbearia': '9602501',
-      'salao': '9602501',
-      'salão': '9602501',
-      'cabeleireiro': '9602501',
-      'loja': '4711300', // Comércio varejista
-      'mercado': '5411206',
-      'padaria': '1091101',
-      'padaria': '1091101'
-    };
-    
-    const cnae = nichosToCNAE[niche.toLowerCase()] || '5611203';
-    
-    // Buscar empresas no Brasil API
-    // Usando um mapeamento de cidades para IDs de municípios
-    const cidadeIds = {
-      'sao paulo': '3550308',
-      'guarulhos': '3518402',
-      'campinas': '3509007',
-      'santos': '3548500',
-      'sorocaba': '3552403',
-      'presidente prudente': '3541406',
-      'ribeirao preto': '3543402',
-      'bauru': '3506003',
-      'piracicaba': '3533901',
-      'marilia': '3529005'
-    };
-    
-    const municipioId = cidadeIds[region.toLowerCase()] || '';
-    
-    // Buscar dados do CNPJ na Brasil API (endpoint de empresas por município)
-    const url = `https://brasilapi.com.br/api/cnpj/v1/municipios/${municipioId}/cnae/${cnae}`;
-    
-    console.log(`[API] Consultando: ${url}`);
-    
-    const response = await fetch(url).catch(() => null);
-    
-    if (!response || !response.ok) {
-      console.log('[API] Endpoint não disponível, usando dados alternativos');
+    if (!apiKey) {
+      console.error('[ERRO] Chave de API do Google não configurada');
       return generateRealisticData(niche, region);
     }
+
+    console.log(`[GOOGLE MAPS API] Buscando: ${niche} em ${region}`);
+    console.log(`[DEBUG] Chave: ${apiKey.substring(0, 10)}...`);
+
+    const query = `${niche} em ${region}`;
     
-    const data = await response.json().catch(() => null);
-    
-    if (data && Array.isArray(data) && data.length > 0) {
-      console.log(`[API] Encontradas ${data.length} empresas`);
-      
-      // Formatar dados da resposta
-      const results = data.slice(0, 10).map((empresa, index) => ({
-        nome: empresa.razao_social || empresa.nome_fantasia || `${niche} ${index + 1}`,
-        telefone: empresa.telefone || '(11) 3000-' + String(1000 + index).padStart(4, '0'),
-        email: empresa.email || `contato@empresa${index + 1}.com.br`,
-        endereco: empresa.endereco ? `${empresa.endereco}, ${region}` : `Rua da Atividade, ${index + 100} - ${region}`,
-        avaliacao: (4.2 + (index * 0.1)).toFixed(1)
-      }));
-      
+    // 1. Text Search - encontrar locais
+    const textSearchUrl = 'https://maps.googleapis.com/maps/api/place/textsearch/json';
+    const textSearchParams = new URLSearchParams({
+      query: query,
+      key: apiKey
+    });
+
+    console.log(`[API] POST ${textSearchUrl}`);
+    const searchResponse = await fetch(textSearchUrl + '?' + textSearchParams.toString(), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': 'Mozilla/5.0'
+      }
+    });
+
+    const searchData = await searchResponse.json();
+    console.log(`[API] Status: ${searchData.status}`);
+
+    if (searchData.status !== 'OK' && searchData.status !== 'ZERO_RESULTS') {
+      console.error(`[API] Erro: ${searchData.status}`, searchData.error_message);
+      return generateRealisticData(niche, region);
+    }
+
+    if (!searchData.results || searchData.results.length === 0) {
+      console.log('[API] Nenhum resultado. Usando dados alternativos.');
+      return generateRealisticData(niche, region);
+    }
+
+    console.log(`[API] Encontrados ${searchData.results.length} resultados`);
+
+    // 2. Para cada resultado, buscar detalhes
+    const results = [];
+    for (const place of searchData.results.slice(0, 8)) {
+      try {
+        const detailsUrl = 'https://maps.googleapis.com/maps/api/place/details/json';
+        const detailsParams = new URLSearchParams({
+          place_id: place.place_id,
+          fields: 'formatted_phone_number,website,formatted_address,rating,name,opening_hours',
+          key: apiKey
+        });
+
+        const detailsResponse = await fetch(detailsUrl + '?' + detailsParams.toString());
+        const detailsData = await detailsResponse.json();
+
+        if (detailsData.status === 'OK' && detailsData.result) {
+          const result = detailsData.result;
+          
+          // Extrair email do website
+          let email = 'Consulte site';
+          if (result.website) {
+            email = await extractEmailFromWebsite(result.website).catch(() => 'Consulte site');
+          }
+
+          results.push({
+            nome: result.name || place.name,
+            telefone: result.formatted_phone_number || 'Não informado',
+            email: email,
+            endereco: result.formatted_address || place.formatted_address || region,
+            avaliacao: result.rating ? result.rating.toFixed(1) : '4.0'
+          });
+
+          console.log(`  ✓ ${result.name}`);
+        }
+      } catch (err) {
+        console.log(`  ✗ Erro ao processar: ${err.message}`);
+      }
+    }
+
+    console.log(`[RESULTADO] Total de empresas: ${results.length}`);
+
+    if (results.length > 0) {
       return results;
     }
-    
+
     return generateRealisticData(niche, region);
-    
+
   } catch (error) {
-    console.error('[ERRO]:', error.message);
+    console.error('[ERRO CRÍTICO]:', error.message);
     return generateRealisticData(niche, region);
   }
 }
