@@ -1,0 +1,141 @@
+const https = require('https');
+
+function fetchJson(url, headers = {}) {
+  return new Promise((resolve, reject) => {
+    const defaultHeaders = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    };
+
+    https.get(url, { headers: { ...defaultHeaders, ...headers } }, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try {
+          if (res.statusCode === 404 || res.statusCode === 400) {
+            reject(new Error('CNPJ não encontrado'));
+          } else if (res.statusCode === 429) {
+            reject(new Error('Muitas requisições. Aguarde...'));
+          } else if (res.statusCode >= 200 && res.statusCode < 300) {
+            resolve(JSON.parse(data));
+          } else {
+            reject(new Error(`Erro HTTP ${res.statusCode}`));
+          }
+        } catch (e) {
+          reject(new Error('Erro ao processar resposta'));
+        }
+      });
+    }).on('error', reject);
+  });
+}
+
+function cleanPhone(phone) {
+  if (!phone) return null;
+  const cleaned = String(phone).replace(/\D/g, '');
+  
+  if (cleaned.length === 11) {
+    // Celular com 9 dígitos: (11) 999999999
+    return `(${cleaned.substring(0, 2)}) ${cleaned.substring(2)}`;
+  } else if (cleaned.length === 10) {
+    // Fixo com 8 dígitos: (11) 9999-9999
+    return `(${cleaned.substring(0, 2)}) ${cleaned.substring(2, 6)}-${cleaned.substring(6)}`;
+  }
+  return phone;
+}
+
+async function searchReceitaWS(cnpj) {
+  try {
+    const url = `https://www.receitaws.com.br/v1/cnpj/${cnpj}`;
+    const data = await fetchJson(url);
+    return {
+      telefone: data.telefone ? cleanPhone(data.telefone) : null,
+      email: data.email || null,
+      razao_social: data.nome,
+      nome_fantasia: data.nome_fantasia || data.nome,
+      logradouro: data.logradouro,
+      numero: data.numero,
+      complemento: data.complemento,
+      municipio: data.municipio,
+      uf: data.uf,
+      cep: data.cep,
+      situacao: data.situacao,
+      data_abertura: data.abertura,
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
+async function searchBrasilAPI(cnpj) {
+  try {
+    const url = `https://brasilapi.com.br/api/cnpj/v1/${cnpj}`;
+    const data = await fetchJson(url);
+    
+    let telefone = null;
+    let email = null;
+    
+    if (data.ddd && data.telefone) {
+      const fullPhone = `${data.ddd}${data.telefone}`;
+      telefone = cleanPhone(fullPhone);
+    }
+    if (data.email) {
+      email = data.email;
+    }
+
+    return {
+      cnpj: data.cnpj,
+      razao_social: data.razao_social || data.company_name,
+      nome_fantasia: data.nome_fantasia || data.trade_name,
+      logradouro: data.logradouro,
+      numero: data.numero,
+      complemento: data.complemento,
+      municipio: data.municipio || data.city,
+      uf: data.uf || data.state,
+      cep: data.cep,
+      telefone: telefone,
+      email: email,
+      situacao: data.descricao_situacao || data.status,
+      data_abertura: data.data_inicio_atividade,
+      natureza: data.descricao_natureza_juridica,
+      atividade: data.cnae_fiscal_descricao,
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
+module.exports = async ({ cnpj }) => {
+  try {
+    let data = await searchReceitaWS(cnpj);
+    
+    if (!data || (!data.telefone && !data.email)) {
+      const brasilData = await searchBrasilAPI(cnpj);
+      if (brasilData) {
+        data = { ...brasilData, ...data };
+      }
+    }
+
+    if (!data) {
+      throw new Error('CNPJ não encontrado em nenhuma base de dados');
+    }
+
+    const endereco = data.logradouro ? `${data.logradouro}, ${data.numero || ''} - ${data.municipio}/${data.uf}` : 'N/A';
+
+    return {
+      cnpj: cnpj,
+      nome: data.razao_social || 'N/A',
+      telefone: data.telefone || 'N/A',
+      email: data.email || 'N/A',
+      endereco: endereco,
+      nome_fantasia: data.nome_fantasia || 'N/A',
+      complemento: data.complemento || 'N/A',
+      cep: data.cep || 'N/A',
+      situacao: data.situacao || 'N/A',
+      data_abertura: data.data_abertura || 'N/A',
+      natureza: data.natureza || 'N/A',
+      atividade: data.atividade || 'N/A',
+    };
+  } catch (error) {
+    throw new Error(error.message || 'Erro ao consultar CNPJ');
+  }
+};
+

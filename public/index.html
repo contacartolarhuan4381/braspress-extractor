@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Braspress Extractor - SaaS</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 600px;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 32px;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 40px 30px;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .result-card {
+            display: none;
+            background: linear-gradient(135deg, #f0f4ff 0%, #f0e8ff 100%);
+            border: 2px solid #667eea;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+        }
+
+        .result-card.show {
+            display: block;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .result-field {
+            margin-bottom: 15px;
+        }
+
+        .result-field label {
+            font-size: 12px;
+            color: #667eea;
+            text-transform: uppercase;
+            font-weight: 700;
+            letter-spacing: 1px;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .result-field p {
+            font-size: 16px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .result-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .btn-small {
+            flex: 1;
+            min-width: 150px;
+            padding: 10px 16px;
+            font-size: 13px;
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .btn-small:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            color: #667eea;
+            margin: 20px 0;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            border: 3px solid #e5e7eb;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .error.show {
+            display: block;
+        }
+
+        .success {
+            background: #efe;
+            color: #3c3;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .success.show {
+            display: block;
+        }
+
+        .footer {
+            background: #f9fafb;
+            padding: 20px 30px;
+            text-align: center;
+            font-size: 12px;
+            color: #6b7280;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        @media (max-width: 600px) {
+            .header h1 { font-size: 24px; }
+            .content { padding: 25px 20px; }
+            .result-actions { flex-direction: column; }
+            .btn-small { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 Braspress</h1>
+            <p>Extrator de dados de CNPJ em segundos</p>
+        </div>
+
+        <div class="content">
+            <div class="input-group">
+                <input 
+                    type="text" 
+                    id="cnpj" 
+                    placeholder="Digite seu CNPJ (ex: 11.222.333/0001-81)"
+                    maxlength="18"
+                />
+                <button id="searchBtn" onclick="searchCNPJ()">Buscar</button>
+            </div>
+
+            <div class="error" id="errorMsg"></div>
+            <div class="success" id="successMsg"></div>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Buscando dados...</p>
+            </div>
+
+            <div class="result-card" id="resultCard">
+                <div class="result-field">
+                    <label>📋 Empresa</label>
+                    <p id="resultNome"></p>
+                </div>
+
+                <div class="result-field">
+                    <label>📞 Telefone</label>
+                    <p id="resultTelefone"></p>
+                </div>
+
+                <div class="result-field">
+                    <label>📧 Email</label>
+                    <p id="resultEmail"></p>
+                </div>
+
+                <div class="result-field">
+                    <label>📍 Endereço</label>
+                    <p id="resultEndereco"></p>
+                </div>
+
+                <div class="result-actions">
+                    <button class="btn-small" onclick="copyPhone()">📋 Copiar Telefone</button>
+                    <button class="btn-small" onclick="copyEmail()">📧 Copiar Email</button>
+                    <button class="btn-small" onclick="copyAll()">📄 Copiar Tudo</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>💡 Braspress Extractor - Sua ferramenta de captação B2B</p>
+        </div>
+    </div>
+
+    <script>
+        let currentData = null;
+
+        async function searchCNPJ() {
+            const cnpj = document.getElementById('cnpj').value.trim();
+            
+            if (!cnpj) {
+                showError('Por favor, insira um CNPJ');
+                return;
+            }
+
+            const clean = cnpj.replace(/\D/g, '');
+            if (clean.length !== 14) {
+                showError('CNPJ deve ter 14 dígitos');
+                return;
+            }
+
+            showLoading(true);
+            hideError();
+            hideSuccess();
+
+            try {
+                const response = await fetch('/api/search', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ cnpj })
+                });
+
+                const result = await response.json();
+
+                if (result.ok) {
+                    currentData = result.data;
+                    document.getElementById('resultNome').textContent = result.data.nome;
+                    document.getElementById('resultTelefone').textContent = result.data.telefone;
+                    document.getElementById('resultEmail').textContent = result.data.email;
+                    document.getElementById('resultEndereco').textContent = result.data.endereco;
+                    
+                    document.getElementById('resultCard').classList.add('show');
+                    showSuccess('✅ Dados encontrados com sucesso!');
+                } else {
+                    showError('❌ ' + result.error);
+                    document.getElementById('resultCard').classList.remove('show');
+                }
+            } catch (error) {
+                showError('Erro ao buscar dados: ' + error.message);
+                document.getElementById('resultCard').classList.remove('show');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function copyPhone() {
+            if (!currentData) return;
+            navigator.clipboard.writeText(currentData.telefone.replace(/\D/g, ''));
+            showSuccess('✅ Telefone copiado!');
+        }
+
+        function copyEmail() {
+            if (!currentData) return;
+            navigator.clipboard.writeText(currentData.email);
+            showSuccess('✅ Email copiado!');
+        }
+
+        function copyAll() {
+            if (!currentData) return;
+            const text = `Nome: ${currentData.nome}\nTelefone: ${currentData.telefone}\nEmail: ${currentData.email}\nEndereço: ${currentData.endereco}`;
+            navigator.clipboard.writeText(text);
+            showSuccess('✅ Todos os dados copiados!');
+        }
+
+        function showError(msg) {
+            const el = document.getElementById('errorMsg');
+            el.textContent = msg;
+            el.classList.add('show');
+        }
+
+        function hideError() {
+            document.getElementById('errorMsg').classList.remove('show');
+        }
+
+        function showSuccess(msg) {
+            const el = document.getElementById('successMsg');
+            el.textContent = msg;
+            el.classList.add('show');
+            setTimeout(() => el.classList.remove('show'), 3000);
+        }
+
+        function hideSuccess() {
+            document.getElementById('successMsg').classList.remove('show');
+        }
+
+        function showLoading(show) {
+            const el = document.getElementById('loading');
+            document.getElementById('searchBtn').disabled = show;
+            if (show) {
+                el.classList.add('show');
+            } else {
+                el.classList.remove('show');
+            }
+        }
+
+        document.getElementById('cnpj').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') searchCNPJ();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Braspress Extractor</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { 
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+        min-height: 100vh;
+        padding: 20px;
+      }
+      .container { 
+        max-width: 900px; 
+        margin: 0 auto; 
+        background: white; 
+        border-radius: 12px; 
+        box-shadow: 0 10px 40px rgba(0,0,0,0.2); 
+        overflow: hidden;
+      }
+      .header {
+        background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+        color: white;
+        padding: 30px 20px;
+        text-align: center;
+      }
+      .logo {
+        font-size: 14px;
+        font-weight: 300;
+        letter-spacing: 2px;
+        margin-bottom: 10px;
+        opacity: 0.9;
+      }
+      .logo-icon {
+        font-size: 40px;
+        margin-bottom: 10px;
+      }
+      .header h1 { 
+        font-size: 32px; 
+        font-weight: bold;
+        margin-bottom: 5px;
+      }
+      .header p { 
+        font-size: 13px; 
+        opacity: 0.95;
+      }
+      .content { padding: 30px; }
+      .tabs {
+        display: flex;
+        gap: 0;
+        margin-bottom: 20px;
+        border-bottom: 2px solid #e5e7eb;
+      }
+      .tab-button {
+        flex: 1;
+        padding: 15px;
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 15px;
+        font-weight: 500;
+        color: #6b7280;
+        border-bottom: 3px solid transparent;
+        transition: all 0.3s;
+      }
+      .tab-button.active {
+        color: #1e3a8a;
+        border-bottom-color: #3b82f6;
+      }
+      .tab-button:hover {
+        color: #1e3a8a;
+      }
+      .tab-content { display: none; }
+      .tab-content.active { display: block; }
+      .input-group { 
+        display: flex; 
+        gap: 12px; 
+        margin-bottom: 20px;
+      }
+      input, button { 
+        padding: 12px 16px; 
+        font-size: 14px; 
+        border-radius: 6px;
+        border: 1px solid #ddd;
+      }
+      #cnpj { 
+        flex: 1; 
+        border: 2px solid #ddd;
+      }
+      #cnpj:focus { 
+        outline: none;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+      }
+      #search, .upload-button { 
+        background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+        color: white; 
+        border: none;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+      }
+      #search:hover:not(:disabled), .upload-button:hover { 
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(30, 58, 138, 0.3);
+      }
+      #search:disabled { 
+        background: #ccc; 
+        cursor: not-allowed; 
+      }
+      #fileInput { display: none; }
+      .file-info {
+        margin-top: 15px;
+        padding: 12px;
+        background: #f0f9ff;
+        border-left: 4px solid #3b82f6;
+        border-radius: 4px;
+        font-size: 13px;
+        color: #1e3a8a;
+      }
+      #logBox {
+        height: 450px;
+        overflow-y: auto;
+        border: 2px solid #e5e7eb;
+        padding: 15px;
+        background: #f9fafb;
+        border-radius: 8px;
+        font-family: 'Courier New', monospace;
+        font-size: 13px;
+        line-height: 1.6;
+        color: #374151;
+        margin-bottom: 20px;
+      }
+      .progress-bar {
+        width: 100%;
+        height: 20px;
+        background: #e5e7eb;
+        border-radius: 10px;
+        overflow: hidden;
+        margin-bottom: 10px;
+      }
+      .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%);
+        width: 0%;
+        transition: width 0.3s;
+      }
+      .progress-text {
+        font-size: 13px;
+        color: #6b7280;
+        text-align: center;
+      }
+      .action-btn {
+        padding: 10px 16px;
+        border: none;
+        border-radius: 6px;
+        color: white;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+        font-size: 13px;
+      }
+      .action-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="container">
+      <div class="header">
+        <div class="logo-icon">🔍</div>
+        <div class="logo">BRASPRESS</div>
+        <h1>Extractor</h1>
+        <p>Extração inteligente de dados de CNPJ</p>
+      </div>
+
+      <div class="content">
+        <div class="tabs">
+          <button class="tab-button active" onclick="switchTab('single')">🎯 CNPJ Único</button>
+          <button class="tab-button" onclick="switchTab('batch')">📊 Lote (TXT/Excel)</button>
+        </div>
+
+        <!-- TAB: CNPJ ÚNICO -->
+        <div id="single" class="tab-content active">
+          <div class="input-group">
+            <input id="cnpj" type="text" placeholder="Ex: 11.222.333/0001-81" maxlength="18" />
+            <button id="search">Buscar</button>
+          </div>
+          
+          <div id="resultCard" style="display: none; margin-bottom: 20px; padding: 20px; background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border: 2px solid #3b82f6; border-radius: 8px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+              <div>
+                <h3 style="color: #1e3a8a; margin-bottom: 10px; font-size: 13px; text-transform: uppercase; letter-spacing: 1px;">📋 Empresa</h3>
+                <p id="resultNome" style="font-size: 16px; font-weight: bold; color: #1e3a8a; margin-bottom: 15px;"></p>
+                
+                <h3 style="color: #1e3a8a; margin-bottom: 10px; font-size: 13px; text-transform: uppercase; letter-spacing: 1px;">📍 Endereço</h3>
+                <p id="resultEndereco" style="font-size: 14px; color: #374151; line-height: 1.6;"></p>
+              </div>
+              
+              <div>
+                <h3 style="color: #1e3a8a; margin-bottom: 10px; font-size: 13px; text-transform: uppercase; letter-spacing: 1px;">📞 Telefone</h3>
+                <p id="resultTelefone" style="font-size: 16px; font-weight: bold; color: #1e3a8a; margin-bottom: 15px;"></p>
+                
+                <h3 style="color: #1e3a8a; margin-bottom: 10px; font-size: 13px; text-transform: uppercase; letter-spacing: 1px;">📧 Email</h3>
+                <p id="resultEmail" style="font-size: 14px; color: #374151;"></p>
+              </div>
+            </div>
+
+            <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #cbd5e1; display: flex; gap: 10px; flex-wrap: wrap;">
+              <button id="saveSingleCSV" class="action-btn" onclick="saveSingleToCSV()" style="background: #10b981; flex: 1;">💾 Salvar em CSV</button>
+              <button id="copyPhone" class="action-btn" onclick="copyPhoneOnly()" style="background: #8b5cf6; flex: 1;">📋 Copiar Telefone</button>
+              <button id="copyEmail" class="action-btn" onclick="copyEmailOnly()" style="background: #f59e0b; flex: 1;">📧 Copiar Email</button>
+            </div>
+          </div>
+
+          <div id="logBox">Aguardando CNPJ...</div>
+        </div>
+
+        <!-- TAB: LOTE -->
+        <div id="batch" class="tab-content">
+          <p style="margin-bottom: 15px; color: #666; font-size: 14px;">
+            📋 Carregue um arquivo TXT (um CNPJ por linha) ou Excel (.xlsx) com CNPJs na primeira coluna
+          </p>
+          <div class="input-group">
+            <input id="fileInput" type="file" accept=".txt,.xlsx,.csv" />
+            <button class="upload-button" onclick="document.getElementById('fileInput').click()">📤 Selecionar Arquivo</button>
+            <button id="processBtn" class="upload-button" disabled onclick="processBatch()">▶️ Processar</button>
+            <button id="downloadBatchCSV" class="upload-button" style="display: none; background: #10b981;" onclick="downloadBatchCSV()">⬇️ Baixar CSV</button>
+          </div>
+          <div class="file-info" id="fileInfo" style="display: none;"></div>
+          <div class="progress-bar" id="progressBar" style="display: none;">
+            <div class="progress-fill" id="progressFill"></div>
+          </div>
+          <div class="progress-text" id="progressText"></div>
+          <div id="logBox" style="margin-top: 20px;">Aguardando arquivo...</div>
+        </div>
+      </div>
+    </div>
+
+    <script src="renderer.js"></script>
+  </body>
+</html>
