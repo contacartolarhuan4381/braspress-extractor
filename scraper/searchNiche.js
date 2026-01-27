@@ -1,66 +1,93 @@
-// Busca por nicho usando web scraping simples + API
-// Estratégia: Buscar no Google e fazer parse dos resultados
+// Busca por nicho usando Google Places API
+// Retorna dados REAIS de empresas
 
-async function searchGoogleMaps(niche, region) {
+async function searchGoogleMaps(niche, region, apiKey) {
   const results = [];
 
   try {
-    // 1. Buscar dados simulados (para demonstração até configurar API)
-    // Em produção, usaria Google Places API, BrasilAPI ou outro serviço
+    if (!apiKey) {
+      console.error('Chave de API do Google não configurada');
+      return [];
+    }
 
-    console.log(`Buscando ${niche} em ${region}`);
+    const query = `${niche} em ${region}`;
+    console.log(`Buscando: ${query}`);
 
-    // Exemplo de dados estruturados para teste
-    const mockData = {
-      'pizzaria_guarulhos': [
-        { nome: 'Pizzaria da Zona', telefone: '(11) 3000-1234', email: 'contato@pizzariazona.com.br', endereco: 'Rua das Flores, 123 - Guarulhos - SP', avaliacao: '4.5' },
-        { nome: 'Pizzaria Sabor', telefone: '(11) 3100-5678', email: 'info@pizzariasabor.com.br', endereco: 'Av. Principal, 456 - Guarulhos - SP', avaliacao: '4.7' },
-        { nome: 'Pizzaria Tino', telefone: '(11) 3200-9999', email: 'contato@pizzariatino.com.br', endereco: 'Rua Central, 789 - Guarulhos - SP', avaliacao: '4.3' },
-        { nome: 'Pizzaria Milano', telefone: '(11) 3300-4567', email: 'milano@pizzaria.com.br', endereco: 'Av. Norte, 321 - Guarulhos - SP', avaliacao: '4.8' },
-      ],
-      'consultório_são paulo': [
-        { nome: 'Consultório Dr. Silva', telefone: '(11) 3050-1111', email: 'contato@drsilva.com.br', endereco: 'Rua das Palmeiras, 1000 - São Paulo - SP', avaliacao: '4.9' },
-        { nome: 'Consultório Médico Central', telefone: '(11) 3150-2222', email: 'agendamento@medicoscentral.com.br', endereco: 'Av. Paulista, 2000 - São Paulo - SP', avaliacao: '4.6' },
-        { nome: 'Consultório Saúde Plus', telefone: '(11) 3250-3333', email: 'contato@saudeplus.com.br', endereco: 'Rua Augusta, 1500 - São Paulo - SP', avaliacao: '4.4' },
-      ],
-      'farmácia_guarulhos': [
-        { nome: 'Farmácia Central', telefone: '(11) 3001-5000', email: 'contato@farmaciacentral.com.br', endereco: 'Rua do Comércio, 500 - Guarulhos - SP', avaliacao: '4.2' },
-        { nome: 'Farmácia 24h', telefone: '(11) 3002-6000', email: 'atendimento@farmacia24h.com.br', endereco: 'Av. Brasil, 1234 - Guarulhos - SP', avaliacao: '4.6' },
-        { nome: 'Farmácia Saúde', telefone: '(11) 3003-7000', email: 'contato@farmaciasaude.com.br', endereco: 'Rua Saúde, 789 - Guarulhos - SP', avaliacao: '4.1' },
-      ]
-    };
+    // 1. Buscar locais usando Text Search
+    const textSearchUrl = new URL('https://maps.googleapis.com/maps/api/place/textsearch/json');
+    textSearchUrl.searchParams.append('query', query);
+    textSearchUrl.searchParams.append('key', apiKey);
 
-    // Normalizar chave de busca
-    const searchKey = `${niche.toLowerCase()}_${region.toLowerCase()}`;
-    const keyLower = searchKey.replace(/\s+/g, '_');
+    const searchResponse = await fetch(textSearchUrl.toString());
+    const searchData = await searchResponse.json();
 
-    // Procurar nos dados de exemplo
-    for (const key in mockData) {
-      if (key.includes(niche.toLowerCase()) && key.includes(region.toLowerCase().split(' ')[0])) {
-        return mockData[key];
+    if (!searchData.results || searchData.results.length === 0) {
+      console.log(`Nenhum resultado encontrado para: ${query}`);
+      return [];
+    }
+
+    console.log(`Encontrados ${searchData.results.length} resultados`);
+
+    // 2. Para cada resultado, pegar detalhes (nome, telefone, website, endereço, rating)
+    for (const place of searchData.results.slice(0, 20)) {
+      try {
+        // Buscar detalhes do lugar
+        const detailsUrl = new URL('https://maps.googleapis.com/maps/api/place/details/json');
+        detailsUrl.searchParams.append('place_id', place.place_id);
+        detailsUrl.searchParams.append('fields', 'formatted_phone_number,website,formatted_address,rating,name,opening_hours');
+        detailsUrl.searchParams.append('key', apiKey);
+
+        const detailsResponse = await fetch(detailsUrl.toString());
+        const detailsData = await detailsResponse.json();
+
+        if (detailsData.result) {
+          const result = detailsData.result;
+          
+          // Extrair email do website (opcional)
+          let email = 'Não informado';
+          if (result.website) {
+            email = await extractEmailFromWebsite(result.website).catch(() => 'Não informado');
+          }
+
+          results.push({
+            nome: result.name || place.name || 'Sem nome',
+            telefone: result.formatted_phone_number || 'Não informado',
+            email: email,
+            endereco: result.formatted_address || place.formatted_address || 'Não informado',
+            avaliacao: result.rating ? result.rating.toFixed(1) : 'Sem avaliação'
+          });
+        }
+      } catch (error) {
+        console.log(`Erro ao processar detalhes: ${error.message}`);
       }
     }
 
-    // Se não encontrar, retornar dados genéricos
-    console.log(`Nenhum resultado específico para: ${niche} em ${region}`);
-    console.log(`Dados disponíveis para teste: pizzaria em guarulhos, consultório em são paulo, farmácia em guarulhos`);
-
-    // Simular busca genérica
-    const genericResults = [
-      {
-        nome: `${niche} ${Math.random().toString(36).substring(7)}`,
-        telefone: `(${Math.floor(Math.random() * 80 + 11)}) 9${Math.floor(Math.random() * 9000 + 1000)}-${Math.floor(Math.random() * 9000 + 1000)}`,
-        email: `contato@${niche.toLowerCase().replace(/\s+/g, '')}.com.br`,
-        endereco: `${region}, SP`,
-        avaliacao: `${(Math.random() * 2 + 3).toFixed(1)}`
-      }
-    ];
-
-    return genericResults;
+    console.log(`Total de empresas extraídas: ${results.length}`);
+    return results;
 
   } catch (error) {
-    console.error('Erro na busca:', error.message);
+    console.error('Erro na busca por nicho:', error.message);
     return [];
+  }
+}
+
+// Tentar extrair email do website
+async function extractEmailFromWebsite(url) {
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      },
+      timeout: 5000
+    });
+
+    if (!response.ok) return null;
+
+    const html = await response.text();
+    const emailMatch = html.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+    return emailMatch ? emailMatch[0] : null;
+  } catch (error) {
+    return null;
   }
 }
 

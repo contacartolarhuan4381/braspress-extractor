@@ -7,6 +7,9 @@ const multer = require('multer');
 const XLSX = require('xlsx');
 const fs = require('fs');
 
+// Carregar variáveis de ambiente
+require('dotenv').config({ path: '.env.local' });
+
 const app = express();
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -185,9 +188,14 @@ app.post('/api/search-niche', async (req, res) => {
             return res.json({ ok: false, error: 'Nicho e região são obrigatórios' });
         }
 
+        const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+        if (!apiKey) {
+            return res.json({ ok: false, error: 'Chave de API não configurada. Contacte o administrador.' });
+        }
+
         console.log(`Buscando ${niche} em ${region}`);
 
-        const results = await searchGoogleMaps(niche, region);
+        const results = await searchGoogleMaps(niche, region, apiKey);
 
         if (results.length === 0) {
             return res.json({ ok: false, error: 'Nenhuma empresa encontrada para esta busca' });
