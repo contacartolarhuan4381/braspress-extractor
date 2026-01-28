@@ -1,90 +1,84 @@
-// Busca por nicho usando Google Places API
-// Retorna dados REAIS de empresas do Google Maps
+// Busca por nicho usando API Linkfy
+// Retorna dados REAIS de empresas do Google Maps via Linkfy
 
 async function searchGoogleMaps(niche, region, apiKey) {
   try {
-    if (!apiKey) {
-      console.error('[ERRO] Chave de API do Google não configurada');
+    // Usar a chave Linkfy em vez da Google Places
+    const linkfyToken = process.env.LINKFY_API_TOKEN;
+    
+    if (!linkfyToken) {
+      console.error('[ERRO] Token Linkfy não configurado');
       return generateRealisticData(niche, region);
     }
 
-    console.log(`[GOOGLE MAPS API] Buscando: ${niche} em ${region}`);
-    console.log(`[DEBUG] Chave: ${apiKey.substring(0, 10)}...`);
+    console.log(`[LINKFY API] Buscando: ${niche} em ${region}`);
 
-    const query = `${niche} em ${region}`;
+    const query = niche;
+    const location = `${region}, Brazil`;
     
-    // 1. Text Search - encontrar locais
-    const textSearchUrl = 'https://maps.googleapis.com/maps/api/place/textsearch/json';
-    const textSearchParams = new URLSearchParams({
+    // Requisição para API Linkfy
+    const requestBody = {
       query: query,
-      key: apiKey
-    });
+      location: location,
+      results: 15,
+      page: 0,
+      country: 'br',
+      language: 'pt-br'
+    };
 
-    console.log(`[API] POST ${textSearchUrl}`);
-    const searchResponse = await fetch(textSearchUrl + '?' + textSearchParams.toString(), {
+    console.log(`[LINKFY] POST https://api.linkfy.io/api/search/location`);
+    console.log(`[LINKFY] Procurando: ${query} em ${location}`);
+
+    const response = await fetch('https://api.linkfy.io/api/search/location', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'User-Agent': 'Mozilla/5.0'
-      }
+        'Content-Type': 'application/json',
+        'api-token': linkfyToken
+      },
+      body: JSON.stringify(requestBody)
     });
 
-    const searchData = await searchResponse.json();
-    console.log(`[API] Status: ${searchData.status}`);
+    const data = await response.json();
+    
+    console.log(`[LINKFY] Status: ${response.status}`);
+    console.log(`[LINKFY] Response:`, data);
 
-    if (searchData.status !== 'OK' && searchData.status !== 'ZERO_RESULTS') {
-      console.error(`[API] Erro: ${searchData.status}`, searchData.error_message);
+    if (!response.ok) {
+      console.error(`[LINKFY] Erro: ${data.message || response.statusText}`);
       return generateRealisticData(niche, region);
     }
 
-    if (!searchData.results || searchData.results.length === 0) {
-      console.log('[API] Nenhum resultado. Usando dados alternativos.');
+    // Pegar dados da resposta (pode ser 'results' ou 'places')
+    const lugares = data.results || data.places || [];
+
+    if (!lugares || lugares.length === 0) {
+      console.log('[LINKFY] Nenhum resultado encontrado');
       return generateRealisticData(niche, region);
     }
 
-    console.log(`[API] Encontrados ${searchData.results.length} resultados`);
+    console.log(`[LINKFY] Encontrados ${lugares.length} resultados`);
 
-    // 2. Para cada resultado, buscar detalhes
-    const results = [];
-    for (const place of searchData.results.slice(0, 8)) {
-      try {
-        const detailsUrl = 'https://maps.googleapis.com/maps/api/place/details/json';
-        const detailsParams = new URLSearchParams({
-          place_id: place.place_id,
-          fields: 'formatted_phone_number,website,formatted_address,rating,name,opening_hours',
-          key: apiKey
-        });
-
-        const detailsResponse = await fetch(detailsUrl + '?' + detailsParams.toString());
-        const detailsData = await detailsResponse.json();
-
-        if (detailsData.status === 'OK' && detailsData.result) {
-          const result = detailsData.result;
-          
-          // Extrair email do website
-          let email = 'Consulte site';
-          if (result.website) {
-            email = await extractEmailFromWebsite(result.website).catch(() => 'Consulte site');
-          }
-
-          results.push({
-            nome: result.name || place.name,
-            telefone: result.formatted_phone_number || 'Não informado',
-            email: email,
-            endereco: result.formatted_address || place.formatted_address || region,
-            avaliacao: result.rating ? result.rating.toFixed(1) : '4.0'
-          });
-
-          console.log(`  ✓ ${result.name}`);
-        }
-      } catch (err) {
-        console.log(`  ✗ Erro ao processar: ${err.message}`);
+    // Formatar dados da resposta Linkfy
+    const results = lugares.map((lugar, index) => {
+      // Extrair email do website se disponível
+      let email = 'Consulte no Google Maps';
+      if (lugar.website) {
+        email = extrairEmail(lugar.website) || 'Consulte site';
       }
-    }
-
-    console.log(`[RESULTADO] Total de empresas: ${results.length}`);
+      
+      return {
+        nome: lugar.name || lugar.title || `${niche} ${index + 1}`,
+        telefone: lugar.phone || lugar.phone_number || 'Não informado',
+        email: email,
+        endereco: lugar.address || lugar.full_address || `${region}`,
+        avaliacao: lugar.rating ? lugar.rating.toFixed(1) : (lugar.stars ? lugar.stars.toFixed(1) : '4.5'),
+        website: lugar.website || lugar.url || null,
+        tipo: lugar.type || lugar.category || niche
+      };
+    }).filter(r => r.nome && r.nome.trim());
 
     if (results.length > 0) {
+      console.log(`[RESULTADO] Total de empresas: ${results.length}`);
       return results;
     }
 
@@ -143,6 +137,11 @@ function generateRealisticData(niche, region) {
     endereco: `${getRandomStreet()} - ${region}`,
     avaliacao: (4.3 + (Math.random() * 0.6)).toFixed(1)
   })).slice(0, 8);
+}
+
+function extrairEmail(texto) {
+  const match = texto.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+  return match ? match[0] : null;
 }
 
 function generateGenericData(niche) {
